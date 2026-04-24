@@ -1,0 +1,21 @@
+<div class="bg-white rounded-lg border border-neutral shadow-sm p-8 flex flex-col items-center justify-center text-center">
+  <!-- Icon -->
+  <span class="material-symbols-outlined text-5xl text-primary mb-4">
+    {{ icon }}
+  </span>
+
+  <!-- Large Number -->
+  <p class="font-headline font-bold text-5xl text-secondary mb-2">
+    {{ value }}
+  </p>
+
+  <!-- Label -->
+  <p class="font-headline font-semibold text-lg text-secondary mb-1">
+    {{ label }}
+  </p>
+
+  <!-- Description -->
+  @if (description) {
+    <p class="text-sm text-secondary/60">{{ description }}</p>
+  }
+</div>

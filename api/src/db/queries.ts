@@ -113,18 +113,40 @@ export const projectQueries = {
       const result = await session.run(`
         MATCH (project:Project)
         OPTIONAL MATCH (team:Team)-[:OWNS]->(project)
-        OPTIONAL MATCH (project)-[:DEPLOYED_ON]->(service:Service)
-        RETURN project, team, collect(service) as services
+        RETURN project, team
       `);
 
-      return result.records.map(record => {
+      const projects = result.records.map(record => {
         const project = record.get('project').properties;
         const team = record.get('team')?.properties || null;
-        const services = record.get('services')
-          .map((s: any) => s?.properties || null)
-          .filter((s: any) => s !== null);
-        return serializeNeo4jResponse({ ...project, team, services }) as ProjectWithRelations;
+        // Ensure project has an ID - use name as fallback for existing projects
+        return { ...project, id: project.id || project.name, team };
       });
+
+      // Load all services once
+      const serviceResult = await session.run(`
+        MATCH (service:Service)
+        OPTIONAL MATCH (service)-[:CALLS]->(called:Service)
+        OPTIONAL MATCH (caller:Service)-[:CALLS]->(service)
+        OPTIONAL MATCH (service)-[:EXPOSED_BY]->(exposed:Service)
+        OPTIONAL MATCH (project:Project)-[:DEPLOYED_ON]->(service)
+        WITH service, collect(DISTINCT called) as calls, collect(DISTINCT caller) as calledBy, collect(DISTINCT exposed) as exposedBy, collect(DISTINCT project) as projects
+        RETURN service, calls, calledBy, exposedBy, projects[0] as project
+      `);
+
+      const services = serviceResult.records.map(rec => {
+        const service = rec.get('service').properties;
+        const serviceProject = rec.get('project')?.properties || null;
+        const calls = rec.get('calls').map((s: any) => s?.properties || null).filter((s: any) => s !== null);
+        const calledBy = rec.get('calledBy').map((s: any) => s?.properties || null).filter((s: any) => s !== null);
+        const exposedBy = rec.get('exposedBy').map((s: any) => s?.properties || null).filter((s: any) => s !== null);
+        return { ...service, project: serviceProject, calls, calledBy, exposedBy };
+      });
+
+      // Attach same services to all projects
+      return projects.map(project =>
+        serializeNeo4jResponse({ ...project, services }) as ProjectWithRelations
+      );
     } finally {
       await session.close();
     }
@@ -133,23 +155,51 @@ export const projectQueries = {
   getById: async (id: string): Promise<ProjectWithRelations | null> => {
     const session = getSession();
     try {
-      const result = await session.run(`
+      // Try to find by ID first, then by name (for projects without IDs)
+      let result = await session.run(`
         MATCH (project:Project {id: $id})
         OPTIONAL MATCH (team:Team)-[:OWNS]->(project)
-        OPTIONAL MATCH (project)-[:DEPLOYED_ON]->(service:Service)
-        RETURN project, team, collect(service) as services
+        RETURN project, team
       `, { id });
+
+      if (result.records.length === 0) {
+        // Fallback: try matching by name
+        result = await session.run(`
+          MATCH (project:Project {name: $id})
+          OPTIONAL MATCH (team:Team)-[:OWNS]->(project)
+          RETURN project, team
+        `, { id });
+      }
 
       if (result.records.length === 0) return null;
 
       const record = result.records[0];
       const project = record.get('project').properties;
       const team = record.get('team')?.properties || null;
-      const services = record.get('services')
-        .map((s: any) => s?.properties || null)
-        .filter((s: any) => s !== null);
 
-      return serializeNeo4jResponse({ ...project, team, services }) as ProjectWithRelations;
+      // Load ALL services in the system (not just deployed to this project)
+      const serviceResult = await session.run(`
+        MATCH (service:Service)
+        OPTIONAL MATCH (service)-[:CALLS]->(called:Service)
+        OPTIONAL MATCH (caller:Service)-[:CALLS]->(service)
+        OPTIONAL MATCH (service)-[:EXPOSED_BY]->(exposed:Service)
+        OPTIONAL MATCH (project:Project)-[:DEPLOYED_ON]->(service)
+        WITH service, collect(DISTINCT called) as calls, collect(DISTINCT caller) as calledBy, collect(DISTINCT exposed) as exposedBy, collect(DISTINCT project) as projects
+        RETURN service, calls, calledBy, exposedBy, projects[0] as project
+      `);
+
+      const services = serviceResult.records.map(rec => {
+        const service = rec.get('service').properties;
+        const serviceProject = rec.get('project')?.properties || null;
+        const calls = rec.get('calls').map((s: any) => s?.properties || null).filter((s: any) => s !== null);
+        const calledBy = rec.get('calledBy').map((s: any) => s?.properties || null).filter((s: any) => s !== null);
+        const exposedBy = rec.get('exposedBy').map((s: any) => s?.properties || null).filter((s: any) => s !== null);
+        return { ...service, project: serviceProject, calls, calledBy, exposedBy };
+      });
+
+      // Ensure project has an ID
+      const projectWithId = { ...project, id: project.id || project.name, team, services };
+      return serializeNeo4jResponse(projectWithId) as ProjectWithRelations;
     } finally {
       await session.close();
     }
@@ -390,6 +440,85 @@ export const relationshipQueries = {
         MERGE (source)-[:EXPOSED_BY]->(target)
       `, { sourceId, targetId });
       return true;
+    } finally {
+      await session.close();
+    }
+  },
+};
+
+export const ecosystemQueries = {
+  getFullGraph: async (): Promise<{ nodes: any[]; edges: any[] }> => {
+    const session = getSession();
+    try {
+      const teamsResult = await session.run('MATCH (t:Team) RETURN t');
+      const projectsResult = await session.run('MATCH (p:Project) RETURN p');
+      const servicesResult = await session.run('MATCH (s:Service) RETURN s');
+      const edgesResult = await session.run(`
+        MATCH (a:Team)-[:OWNS]->(b:Project)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'OWNS' AS type
+        UNION ALL
+        MATCH (a:Project)-[:DEPLOYED_ON]->(b:Service)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'DEPLOYED_ON' AS type
+        UNION ALL
+        MATCH (a:Service)-[:CALLS]->(b:Service)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'CALLS' AS type
+        UNION ALL
+        MATCH (a:Service)-[:EXPOSED_BY]->(b:Service)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'EXPOSED_BY' AS type
+      `);
+
+      const enrichResult = await session.run(`
+        MATCH (s:Service)
+        OPTIONAL MATCH (p:Project)-[:DEPLOYED_ON]->(s)
+        OPTIONAL MATCH (t:Team)-[:OWNS]->(p)
+        RETURN s.name AS serviceName, p.name AS projectName, t.name AS teamName
+      `);
+
+      const teams = teamsResult.records.map(r => {
+        const tProps = r.get('t').properties;
+        return {
+          ...tProps,
+          id: tProps.id || tProps.name,
+          nodeType: 'TEAM',
+        };
+      });
+      const projects = projectsResult.records.map(r => {
+        const pProps = r.get('p').properties;
+        return {
+          ...pProps,
+          id: pProps.id || pProps.name,
+          nodeType: 'PROJECT',
+        };
+      });
+
+      const serviceEnrichment: Record<string, { projectName?: string; teamName?: string }> = {};
+      enrichResult.records.forEach(r => {
+        const sName = r.get('serviceName');
+        if (sName) {
+          serviceEnrichment[sName] = {
+            projectName: r.get('projectName') ?? undefined,
+            teamName: r.get('teamName') ?? undefined,
+          };
+        }
+      });
+
+      const services = servicesResult.records.map(r => {
+        const sProps = r.get('s').properties;
+        return {
+          ...sProps,
+          id: sProps.id || sProps.name,
+          nodeType: 'SERVICE',
+          ...serviceEnrichment[sProps.name],
+        };
+      });
+
+      const edges = edgesResult.records.map(r => ({
+        sourceId: r.get('sourceId'),
+        targetId: r.get('targetId'),
+        type: r.get('type'),
+      }));
+
+      return serializeNeo4jResponse({ nodes: [...teams, ...projects, ...services], edges });
     } finally {
       await session.close();
     }

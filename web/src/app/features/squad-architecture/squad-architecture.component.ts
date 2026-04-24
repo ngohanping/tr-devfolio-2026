@@ -2,12 +2,16 @@ import { Component, ChangeDetectionStrategy, ChangeDetectorRef, ElementRef, Host
 import { AsyncPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { Observable, combineLatest } from 'rxjs';
+import { Observable, combineLatest, finalize } from 'rxjs';
+import { take } from 'rxjs/operators';
 
 import { ArchitectureService } from '../../core/services/architecture.service';
 import { ExportService } from '../../core/services/export.service';
+import { ApiService } from '../../core/services/api.service';
 import { NodeCardComponent } from '../../shared/components/node-card/node-card.component';
-import { ArchitectureEdge, ArchitectureNode } from '../../shared/models/architecture-node.model';
+import { ProjectListComponent } from './project-list/project-list.component';
+import { CreateProjectModalComponent } from './create-project-modal/create-project-modal.component';
+import { ArchitectureEdge, ArchitectureNode, FrontendProject, CreateProjectPayload, ProjectWithRelations } from '../../shared/models/architecture-node.model';
 
 export interface CanvasState {
   nodes: ArchitectureNode[];
@@ -19,7 +23,7 @@ const NODE_HEIGHT = 110;
 
 @Component({
   selector: 'app-squad-architecture',
-  imports: [AsyncPipe, FormsModule, CdkDrag, NodeCardComponent],
+  imports: [AsyncPipe, FormsModule, CdkDrag, NodeCardComponent, ProjectListComponent, CreateProjectModalComponent],
   templateUrl: './squad-architecture.component.html',
   styleUrl: './squad-architecture.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -27,10 +31,20 @@ const NODE_HEIGHT = 110;
 export class SquadArchitectureComponent implements OnInit {
   private readonly architectureService = inject(ArchitectureService);
   private readonly exportService = inject(ExportService);
+  private readonly apiService = inject(ApiService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   @ViewChild('canvasContainer') canvasContainerRef!: ElementRef<HTMLElement>;
 
+  // Project list state
+  projects: FrontendProject[] = [];
+  selectedProject: FrontendProject | null = null;
+  showCreateModal = false;
+  projectsLoading = false;
+  projectsError: string | null = null;
+  isSubmittingCreate = false;
+
+  // Canvas state
   canvasState$!: Observable<CanvasState>;
   marketplaceServices$!: Observable<ArchitectureNode[]>;
   marketplaceFilter = '';
@@ -40,11 +54,102 @@ export class SquadArchitectureComponent implements OnInit {
   connectionSourceId: string | null = null;
 
   ngOnInit(): void {
-    this.canvasState$ = combineLatest({
-      nodes: this.architectureService.getCanvasNodes$(),
-      edges: this.architectureService.getEdges$(),
+    this.loadProjects();
+  }
+
+  private loadProjects(): void {
+    this.projectsLoading = true;
+    this.cdr.markForCheck();
+    this.apiService.getProjects().pipe(
+      take(1),
+      finalize(() => {
+        this.projectsLoading = false;
+        this.cdr.markForCheck();
+      }),
+    ).subscribe({
+      next: (res) => {
+        this.projects = res.data.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          serviceCount: p.services.length,
+        }));
+      },
+      error: (err: any) => {
+        this.projectsError = err.message ?? 'Failed to load projects';
+      },
     });
-    this.marketplaceServices$ = this.architectureService.getMarketplaceServices$();
+  }
+
+  onLoadProject(project: FrontendProject): void {
+    this.apiService.getProject(project.id).pipe(take(1)).subscribe({
+      next: (res) => {
+        this.architectureService.loadForProject(res.data);
+        this.selectedProject = project;
+        this.canvasState$ = combineLatest({
+          nodes: this.architectureService.getCanvasNodes$(),
+          edges: this.architectureService.getEdges$(),
+        });
+        this.marketplaceServices$ = this.architectureService.getMarketplaceServices$();
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  onBackToProjects(): void {
+    this.selectedProject = null;
+    this.architectureService.reset();
+    this.cdr.markForCheck();
+  }
+
+  onNewProject(): void {
+    this.showCreateModal = true;
+    this.cdr.markForCheck();
+  }
+
+  onModalCancelled(): void {
+    this.showCreateModal = false;
+    this.cdr.markForCheck();
+  }
+
+  onCreateProjectSubmitted(payload: CreateProjectPayload): void {
+    this.isSubmittingCreate = true;
+    this.cdr.markForCheck();
+    this.apiService.createProject(payload).pipe(
+      take(1),
+      finalize(() => {
+        this.isSubmittingCreate = false;
+        this.cdr.markForCheck();
+      }),
+    ).subscribe({
+      next: (res) => {
+        this.showCreateModal = false;
+        const newProjectFull: ProjectWithRelations = {
+          ...res.data,
+          team: null,
+          services: [],
+          createdAt: '',
+          updatedAt: '',
+        };
+        this.architectureService.loadForProject(newProjectFull);
+        this.selectedProject = {
+          id: res.data.id,
+          name: res.data.name,
+          description: res.data.description,
+          serviceCount: 0,
+        };
+        this.projects = [this.selectedProject, ...this.projects];
+        this.canvasState$ = combineLatest({
+          nodes: this.architectureService.getCanvasNodes$(),
+          edges: this.architectureService.getEdges$(),
+        });
+        this.marketplaceServices$ = this.architectureService.getMarketplaceServices$();
+      },
+    });
+  }
+
+  trackByProjectId(_index: number, project: FrontendProject): string {
+    return project.id;
   }
 
   @HostListener('document:keydown.escape')
