@@ -1,0 +1,46 @@
+<div
+  class="relative bg-white rounded-lg border-2 p-4 min-w-[200px] shadow-sm cursor-grab active:cursor-grabbing select-none"
+  [ngClass]="borderClass"
+  role="article"
+  [attr.aria-label]="node.name + ' ' + node.type + ' node'"
+>
+  <!-- Header row -->
+  <div class="flex items-center justify-between mb-2">
+    <span
+      class="text-[10px] font-headline font-semibold tracking-widest uppercase"
+      [ngClass]="typeLabelClass"
+    >
+      {{ node.type }}
+    </span>
+    <span
+      class="material-symbols-outlined text-[16px]"
+      [ngClass]="statusIconClass"
+    >{{ statusIcon }}</span>
+  </div>
+
+  <!-- Name -->
+  <p class="font-headline font-semibold text-secondary text-base leading-tight mb-1">
+    {{ node.name }}
+  </p>
+
+  <!-- Subtitle -->
+  <p class="text-xs text-secondary/50 mb-3">{{ node.subtitle }}</p>
+
+  <!-- Tags -->
+  @if (node.tags && node.tags.length > 0) {
+    <div class="flex flex-wrap gap-1">
+      @for (tag of node.tags; track tag) {
+        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-neutral text-secondary/60">
+          {{ tag }}
+        </span>
+      }
+    </div>
+  }
+
+  <!-- Restricted overlay label -->
+  @if (node.status === 'restricted') {
+    <p class="mt-2 text-[10px] font-semibold tracking-widest text-red-500 uppercase">
+      Restricted Access
+    </p>
+  }
+</div>

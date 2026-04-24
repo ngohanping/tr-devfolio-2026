@@ -1,0 +1,48 @@
+<aside class="flex flex-col w-60 min-h-screen bg-secondary text-tertiary select-none">
+
+  <!-- Logo -->
+  <div class="px-5 pt-6 pb-4">
+    <div class="flex items-center gap-2">
+      <span class="w-7 h-7 rounded bg-primary flex items-center justify-center">
+        <span class="material-symbols-outlined text-secondary text-base">hub</span>
+      </span>
+      <div>
+        <p class="font-headline font-semibold text-primary text-sm leading-tight">Architecture Hub</p>
+        <p class="text-[10px] text-neutral/50 tracking-widest uppercase">Precision Systems</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <nav class="flex-1 px-3 py-2">
+    <ul class="space-y-0.5">
+      @for (item of navItems; track item.route) {
+        <li>
+          <a
+            [routerLink]="item.route"
+            routerLinkActive="!text-primary border-primary bg-white/5"
+            class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors border-l-2 border-transparent"
+            [routerLinkActiveOptions]="{ exact: false }"
+          >
+            <span class="material-symbols-outlined text-[18px]">{{ item.icon }}</span>
+            {{ item.label }}
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+
+  <!-- User chip -->
+  <div class="px-4 py-4 border-t border-white/10">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+        <span class="font-headline font-bold text-secondary text-xs">JD</span>
+      </div>
+      <div class="min-w-0">
+        <p class="font-headline font-semibold text-white text-xs truncate">SYSTEM ARCH</p>
+        <p class="text-[10px] text-white/40">v4.2.0-stable</p>
+      </div>
+    </div>
+  </div>
+
+</aside>

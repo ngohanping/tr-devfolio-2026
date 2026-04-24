@@ -1,0 +1,146 @@
+<div class="flex h-full overflow-hidden">
+
+  <!-- ── Canvas ── -->
+  <div class="relative flex-1 bg-neutral overflow-auto" #canvasContainer>
+
+    <!-- Toolbar overlay -->
+    <div class="sticky top-4 left-4 z-10 inline-flex items-center gap-1 bg-white rounded-lg shadow-md px-2 py-1.5 ml-4 mt-4">
+      <button class="p-1.5 rounded hover:bg-neutral transition-colors" aria-label="Select" title="Select">
+        <span class="material-symbols-outlined text-secondary text-[18px]">near_me</span>
+      </button>
+      <button class="p-1.5 rounded hover:bg-neutral transition-colors" aria-label="Share" title="Share">
+        <span class="material-symbols-outlined text-secondary text-[18px]">share</span>
+      </button>
+      <button class="p-1.5 rounded hover:bg-neutral transition-colors" aria-label="Add node" title="Add node">
+        <span class="material-symbols-outlined text-secondary text-[18px]">add</span>
+      </button>
+      <div class="w-px h-5 bg-secondary/10 mx-0.5"></div>
+      <button class="p-1.5 rounded hover:bg-neutral transition-colors" aria-label="Zoom in" title="Zoom in">
+        <span class="material-symbols-outlined text-secondary text-[18px]">zoom_in</span>
+      </button>
+      <button class="p-1.5 rounded hover:bg-neutral transition-colors" aria-label="Zoom out" title="Zoom out">
+        <span class="material-symbols-outlined text-secondary text-[18px]">zoom_out</span>
+      </button>
+    </div>
+
+    <!-- Draggable canvas — nodes use cdkDragFreeDragPosition so CDK owns the transform, no double-offset -->
+    <div class="absolute inset-0" style="min-width: 1200px; min-height: 800px;">
+      @if (canvasNodes$ | async; as nodes) {
+        @for (node of nodes; track trackById($index, node)) {
+          <div
+            cdkDrag
+            [cdkDragFreeDragPosition]="node.position"
+            (cdkDragEnded)="onNodeDragEnded($event, node)"
+            class="absolute top-0 left-0 cursor-grab active:cursor-grabbing"
+          >
+            <app-node-card [node]="node" />
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Canvas Stats card -->
+    @if (canvasNodes$ | async; as nodes) {
+      <div class="absolute bottom-4 left-4 bg-white rounded-xl shadow-md p-5 w-56 z-10">
+        <p class="font-headline font-semibold text-secondary text-sm mb-3">Canvas Stats</p>
+        <div class="space-y-1.5 text-xs mb-4">
+          <div class="flex justify-between">
+            <span class="text-secondary/60">Nodes Active</span>
+            <span class="font-semibold text-secondary">{{ nodes.length }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-secondary/60">Sync Status</span>
+            <span class="font-semibold text-node-service">Healthy</span>
+          </div>
+        </div>
+        <button
+          class="w-full py-2 rounded-md bg-primary text-secondary text-xs font-headline font-semibold hover:bg-primary/90 transition-colors"
+          (click)="onExportMermaid(nodes)"
+        >
+          Export Mermaid.js
+        </button>
+      </div>
+    }
+
+    <!-- FAB -->
+    <button
+      class="fixed bottom-6 right-80 w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors z-10"
+      aria-label="Add node"
+    >
+      <span class="material-symbols-outlined text-secondary text-[24px]">add</span>
+    </button>
+
+  </div>
+
+  <!-- ── Service Marketplace ── -->
+  <aside class="w-72 flex flex-col bg-white border-l border-neutral/80 flex-shrink-0">
+
+    <!-- Header -->
+    <div class="px-5 pt-5 pb-3 border-b border-neutral/60">
+      <p class="font-headline font-semibold text-secondary text-sm">Service Marketplace</p>
+      <p class="text-xs text-secondary/50 mt-0.5">Drag public entry points to canvas</p>
+    </div>
+
+    <!-- Filter -->
+    <div class="px-4 pt-3 pb-2">
+      <div class="relative">
+        <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-secondary/40 text-[16px]">filter_list</span>
+        <input
+          type="text"
+          [(ngModel)]="marketplaceFilter"
+          placeholder="Filter entry points..."
+          class="w-full pl-8 pr-3 py-2 text-xs rounded-md bg-neutral border border-neutral/80 text-secondary placeholder:text-secondary/40 focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+      </div>
+    </div>
+
+    <!-- Service list -->
+    <div class="flex-1 overflow-y-auto px-4 py-2 space-y-3">
+      @if (marketplaceServices$ | async; as services) {
+        @for (service of services; track service.id) {
+          <div
+            class="bg-white rounded-lg border border-neutral p-3 shadow-sm hover:shadow-md hover:border-primary/40 transition-all"
+            [class.opacity-50]="service.status === 'restricted'"
+          >
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-md bg-neutral flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span class="material-symbols-outlined text-secondary/40 text-[16px]">widgets</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="font-headline font-semibold text-secondary text-sm truncate">{{ service.name }}</p>
+                <p class="text-[11px] text-secondary/50 mb-2">{{ service.subtitle }}</p>
+                @if (service.tags) {
+                  <div class="flex flex-wrap gap-1 mb-2">
+                    @for (tag of service.tags; track tag) {
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-neutral text-secondary/60">{{ tag }}</span>
+                    }
+                  </div>
+                }
+                @if (service.status === 'restricted') {
+                  <p class="text-[10px] font-semibold text-red-500 uppercase tracking-widest">Restricted Access</p>
+                } @else {
+                  <button
+                    class="text-[10px] font-semibold text-primary hover:underline"
+                    (click)="addToCanvas(service)"
+                  >
+                    + Add to canvas
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Publish button -->
+    <div class="px-4 py-4 border-t border-neutral/60">
+      <button class="w-full py-2.5 rounded-md border-2 border-secondary text-secondary text-sm font-headline font-semibold flex items-center justify-center gap-2 hover:bg-secondary hover:text-white transition-colors">
+        <span class="material-symbols-outlined text-[16px]">publish</span>
+        Publish Services
+      </button>
+    </div>
+
+  </aside>
+
+</div>
