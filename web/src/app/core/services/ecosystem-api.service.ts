@@ -48,13 +48,18 @@ export class EcosystemApiService {
 const MOCK_ECOSYSTEM_RESPONSE = {
   data: {
     nodes: [
-      { id: 't1', nodeType: 'TEAM' as const, name: 'Platform Team', lead: 'Alice' },
-      { id: 't2', nodeType: 'TEAM' as const, name: 'Data Team', lead: 'Bob' },
-      { id: 'p1', nodeType: 'PROJECT' as const, name: 'Auth System', teamId: 't1' },
-      { id: 'p2', nodeType: 'PROJECT' as const, name: 'Analytics Pipeline', teamId: 't2' },
-      { id: 's1', nodeType: 'SERVICE' as const, name: 'User Service', type: 'SERVICE', status: 'active', projectName: 'Auth System', teamName: 'Platform Team' },
-      { id: 's2', nodeType: 'SERVICE' as const, name: 'Postgres DB', type: 'DATABASE', status: 'active', projectName: 'Auth System', teamName: 'Platform Team' },
-      { id: 's3', nodeType: 'SERVICE' as const, name: 'Analytics Worker', type: 'WORKER', status: 'active', projectName: 'Analytics Pipeline', teamName: 'Data Team' },
+      { id: 't1', nodeType: 'TEAM' as const, name: 'Booking Team', lead: 'Alice' },
+      { id: 't2', nodeType: 'TEAM' as const, name: 'Central Engine Team', lead: 'Bob' },
+      { id: 'p1', nodeType: 'PROJECT' as const, name: 'Booking Application', teamId: 't1' },
+      { id: 'p2', nodeType: 'PROJECT' as const, name: 'Central Booking Engine', teamId: 't2' },
+      // Booking Application services
+      { id: 's1', nodeType: 'SERVICE' as const, name: 'API Gateway', type: 'SERVICE', status: 'active', projectName: 'Booking Application', teamName: 'Booking Team' },
+      { id: 's2', nodeType: 'SERVICE' as const, name: 'Lambda Function', type: 'WORKER', status: 'active', projectName: 'Booking Application', teamName: 'Booking Team' },
+      // Central Booking Engine services
+      { id: 's3', nodeType: 'SERVICE' as const, name: 'API Gateway', type: 'SERVICE', status: 'active', projectName: 'Central Booking Engine', teamName: 'Central Engine Team' },
+      { id: 's4', nodeType: 'SERVICE' as const, name: 'Lambda Function', type: 'WORKER', status: 'active', projectName: 'Central Booking Engine', teamName: 'Central Engine Team' },
+      // External Service Provider
+      { id: 's5', nodeType: 'SERVICE' as const, name: 'External Service Provider', type: 'SERVICE', status: 'active' },
     ],
     edges: [
       { sourceId: 't1', targetId: 'p1', type: 'OWNS' as const },
@@ -62,7 +67,12 @@ const MOCK_ECOSYSTEM_RESPONSE = {
       { sourceId: 'p1', targetId: 's1', type: 'DEPLOYED_ON' as const },
       { sourceId: 'p1', targetId: 's2', type: 'DEPLOYED_ON' as const },
       { sourceId: 'p2', targetId: 's3', type: 'DEPLOYED_ON' as const },
+      { sourceId: 'p2', targetId: 's4', type: 'DEPLOYED_ON' as const },
+      // Call chain
       { sourceId: 's1', targetId: 's2', type: 'CALLS' as const },
+      { sourceId: 's2', targetId: 's3', type: 'CALLS' as const },
+      { sourceId: 's3', targetId: 's4', type: 'CALLS' as const },
+      { sourceId: 's4', targetId: 's5', type: 'CALLS' as const },
     ],
   },
 };

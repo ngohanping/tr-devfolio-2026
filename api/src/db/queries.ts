@@ -371,8 +371,8 @@ export const relationshipQueries = {
     const session = getSession();
     try {
       await session.run(`
-        MATCH (source:Service {id: $sourceId})
-        MATCH (target:Service {id: $targetId})
+        MATCH (source:Service) WHERE source.id = $sourceId OR source.name = $sourceId
+        MATCH (target:Service) WHERE target.id = $targetId OR target.name = $targetId
         MERGE (source)-[:CALLS]->(target)
       `, { sourceId, targetId });
       return true;
@@ -385,8 +385,8 @@ export const relationshipQueries = {
     const session = getSession();
     try {
       await session.run(`
-        MATCH (source:Service {id: $sourceId})
-        MATCH (target:Service {id: $targetId})
+        MATCH (source:Service) WHERE source.id = $sourceId OR source.name = $sourceId
+        MATCH (target:Service) WHERE target.id = $targetId OR target.name = $targetId
         MERGE (source)-[:EXPOSED_BY]->(target)
       `, { sourceId, targetId });
       return true;
@@ -403,6 +403,8 @@ export const ecosystemQueries = {
       const teamsResult = await session.run('MATCH (t:Team) RETURN t');
       const projectsResult = await session.run('MATCH (p:Project) RETURN p');
       const servicesResult = await session.run('MATCH (s:Service) RETURN s');
+
+      // Get all relationships including transitive ones
       const edgesResult = await session.run(`
         MATCH (a:Team)-[:OWNS]->(b:Project)
         RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'OWNS' AS type
@@ -415,6 +417,14 @@ export const ecosystemQueries = {
         UNION ALL
         MATCH (a:Service)-[:EXPOSED_BY]->(b:Service)
         RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'EXPOSED_BY' AS type
+        UNION ALL
+        MATCH (a:Project)-[:DEPLOYED_ON]->(s:Service)-[:CALLS*1..]->(b:Service)
+        WHERE NOT (a)-[:DEPLOYED_ON]->(b)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'CALLS' AS type
+        UNION ALL
+        MATCH (a:Team)-[:OWNS]->(p:Project)-[:DEPLOYED_ON]->(s:Service)
+        WHERE NOT (a)-[:OWNS]->(s)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(s.id, s.name) AS targetId, 'DEPLOYED_ON' AS type
       `);
 
       const enrichResult = await session.run(`
@@ -432,6 +442,7 @@ export const ecosystemQueries = {
           nodeType: 'TEAM',
         };
       });
+
       const projects = projectsResult.records.map(r => {
         const pProps = r.get('p').properties;
         return {
@@ -462,11 +473,19 @@ export const ecosystemQueries = {
         };
       });
 
-      const edges = edgesResult.records.map(r => ({
-        sourceId: r.get('sourceId'),
-        targetId: r.get('targetId'),
-        type: r.get('type'),
-      }));
+      // Deduplicate edges based on sourceId, targetId, and type
+      const edgeMap = new Map<string, { sourceId: string; targetId: string; type: string }>();
+      edgesResult.records.forEach(r => {
+        const sourceId = r.get('sourceId');
+        const targetId = r.get('targetId');
+        const type = r.get('type');
+        const key = `${sourceId}--${targetId}--${type}`;
+        if (!edgeMap.has(key)) {
+          edgeMap.set(key, { sourceId, targetId, type });
+        }
+      });
+
+      const edges = Array.from(edgeMap.values());
 
       return serializeNeo4jResponse({ nodes: [...teams, ...projects, ...services], edges });
     } finally {

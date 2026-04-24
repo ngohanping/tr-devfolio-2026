@@ -41,22 +41,19 @@ export class EcosystemViewComponent implements OnInit {
   readonly SECTION_GAP = 150;
 
   readonly LEGEND_NODES: { label: string; borderClass: string }[] = [
-    { label: 'Project', borderClass: 'border-blue-500' },
     { label: 'Service', borderClass: 'border-green-500' },
     { label: 'Proposed', borderClass: 'border-orange-500' },
   ];
 
   readonly LEGEND_EDGES: { label: string; color: string; dashed: boolean }[] = [
-    { label: 'DEPLOYED_ON', color: '#6366f1', dashed: false },
     { label: 'CALLS', color: '#22c55e', dashed: false },
-    { label: 'EXPOSED_BY', color: '#f97316', dashed: true },
   ];
 
   ngOnInit(): void {
     this.ecosystemApiService.getEcosystem$()
       .pipe(filter((graph): graph is EcosystemGraph => graph !== null))
       .subscribe(graph => {
-        this.edges = this.prepareEdges(graph.edges);
+        this.edges = this.prepareEdges(graph.edges, graph.nodes);
         this.layoutNodes(graph.nodes);
         this.cdr.markForCheck();
       });
@@ -64,72 +61,89 @@ export class EcosystemViewComponent implements OnInit {
   }
 
   private layoutNodes(nodes: EcosystemNode[]): void {
-    const projects = nodes.filter(n => n.nodeType === 'PROJECT').sort((a, b) => a.name.localeCompare(b.name));
-    const projectCols = Math.min(this.COLS, projects.length) || 1;
+    const services = nodes.filter(n => n.nodeType === 'SERVICE');
+    this.projectNodes = [];
 
-    this.projectNodes = projects.map((p, i) => {
-      const serviceCount = 0;
-      return {
-        ...p,
-        x: this.CANVAS_PAD + (i % projectCols) * (this.CARD_WIDTH + this.COL_GAP),
-        y: this.CANVAS_PAD,
-        serviceCount,
-      } as PositionedProjectNode;
+    // Calculate topological levels based on call graph (reverse depth from leaf nodes)
+    const callEdges = this.edges.filter(e => e.type === 'CALLS');
+
+    // Build adjacency lists for the call graph
+    const outgoing = new Map<string, string[]>();
+    const incoming = new Map<string, string[]>();
+
+    services.forEach(s => {
+      outgoing.set(s.id, []);
+      incoming.set(s.id, []);
     });
 
-    const services = nodes.filter(n => n.nodeType === 'SERVICE');
-    const groups = new Map<string, EcosystemNode[]>();
-    for (const svc of services) {
-      const key = this.normalizeType(svc.type);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(svc);
-    }
+    callEdges.forEach(e => {
+      if (outgoing.has(e.sourceId) && outgoing.has(e.targetId)) {
+        outgoing.get(e.sourceId)!.push(e.targetId);
+        incoming.get(e.targetId)!.push(e.sourceId);
+      }
+    });
 
-    const servicesCols = Math.min(this.COLS, groups.size) || 1;
-    const servicesTopY = this.CANVAS_PAD + this.CARD_HEIGHT + this.SECTION_GAP;
+    // Calculate depth: distance from leaf nodes (sinks with out-degree 0)
+    const depth = new Map<string, number>();
+    const calculateDepth = (nodeId: string, visited = new Set<string>()): number => {
+      if (depth.has(nodeId)) return depth.get(nodeId)!;
+      if (visited.has(nodeId)) return 0; // Cycle detection
 
-    this.serviceNodes = [...groups.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([normalizedType, members], i) => {
-        const first = members[0];
-        return {
-          ...first,
-          id: `merged-${normalizedType}`,
-          name: this.formatDisplayName(normalizedType),
-          displayName: this.formatDisplayName(normalizedType),
-          count: members.length,
-          memberNames: members.map(m => m.name),
-          memberIds: members.map(m => m.id).filter((id): id is string => id !== null && id !== undefined),
-          x: this.CANVAS_PAD + (i % servicesCols) * (this.CARD_WIDTH + this.COL_GAP),
-          y: servicesTopY + Math.floor(i / servicesCols) * (this.CARD_HEIGHT + this.ROW_GAP),
-        } as MergedServiceNode;
+      visited.add(nodeId);
+      const targets = outgoing.get(nodeId) || [];
+
+      if (targets.length === 0) {
+        depth.set(nodeId, 0); // Leaf node
+      } else {
+        const maxChildDepth = Math.max(...targets.map(t => calculateDepth(t, new Set(visited))));
+        depth.set(nodeId, maxChildDepth + 1);
+      }
+
+      return depth.get(nodeId)!;
+    };
+
+    services.forEach(s => calculateDepth(s.id));
+
+    // Group services by depth level (deeper levels = further left/higher priority)
+    const levelGroups = new Map<number, EcosystemNode[]>();
+    services.forEach(s => {
+      const level = depth.get(s.id) || 0;
+      if (!levelGroups.has(level)) levelGroups.set(level, []);
+      levelGroups.get(level)!.push(s);
+    });
+
+    // Sort levels in descending order (high depth on left)
+    const sortedLevels = Array.from(levelGroups.entries())
+      .sort((a, b) => b[0] - a[0])
+      .map(([_, services]) => services.sort((a, b) => a.name.localeCompare(b.name)));
+
+    this.serviceNodes = [];
+    let xPos = this.CANVAS_PAD;
+
+    sortedLevels.forEach(levelServices => {
+      levelServices.forEach((svc, i) => {
+        this.serviceNodes.push({
+          ...svc,
+          id: svc.id,
+          displayName: svc.name,
+          count: 1,
+          memberNames: [svc.name],
+          memberIds: svc.id ? [svc.id] : [],
+          x: xPos,
+          y: this.CANVAS_PAD + (i % 2) * (this.CARD_HEIGHT + this.ROW_GAP),
+        } as MergedServiceNode);
       });
+      xPos += this.CARD_WIDTH + this.COL_GAP;
+    });
 
-    const projectRows = Math.ceil(projects.length / projectCols);
-    const serviceRows = Math.ceil(this.serviceNodes.length / servicesCols);
+    const maxServicesPerLevel = Math.max(...sortedLevels.map(l => l.length));
     const totalHeight = this.CANVAS_PAD * 2 +
-                       (projectRows * this.CARD_HEIGHT) +
-                       this.SECTION_GAP +
-                       (serviceRows * (this.CARD_HEIGHT + this.ROW_GAP));
+                       Math.ceil(maxServicesPerLevel / 1) * (this.CARD_HEIGHT + this.ROW_GAP);
     const totalWidth = this.CANVAS_PAD * 2 +
-                      Math.max(projectCols, servicesCols) * (this.CARD_WIDTH + this.COL_GAP) -
-                      this.COL_GAP;
+                      sortedLevels.length * (this.CARD_WIDTH + this.COL_GAP);
 
     this.canvasWidth = Math.max(1000, totalWidth);
     this.canvasHeight = totalHeight;
-
-    const projectServiceMap = new Map<string, number>();
-    for (const p of this.projectNodes) {
-      projectServiceMap.set(p.id, 0);
-    }
-    this.edges.forEach(e => {
-      if (e.type === 'DEPLOYED_ON' && this.projectNodes.some(p => p.id === e.sourceId)) {
-        projectServiceMap.set(e.sourceId, (projectServiceMap.get(e.sourceId) ?? 0) + 1);
-      }
-    });
-    this.projectNodes.forEach(p => {
-      p.serviceCount = projectServiceMap.get(p.id) ?? 0;
-    });
   }
 
   private normalizeType(type: string | undefined): string {
@@ -143,35 +157,21 @@ export class EcosystemViewComponent implements OnInit {
       .join(' ');
   }
 
-  private prepareEdges(rawEdges: EcosystemEdge[]): EcosystemEdge[] {
-    const memberToMerged = new Map<string, string>();
-    for (const node of this.serviceNodes) {
-      for (const memberId of node.memberIds) {
-        memberToMerged.set(memberId, node.id);
-      }
-    }
-
+  private prepareEdges(rawEdges: EcosystemEdge[], nodes: EcosystemNode[]): EcosystemEdge[] {
+    const serviceIds = new Set(nodes.filter(n => n.nodeType === 'SERVICE').map(s => s.id));
     const seen = new Set<string>();
     const processed: EcosystemEdge[] = [];
 
     for (const edge of rawEdges) {
       if (!edge.sourceId || !edge.targetId) continue;
+      // Only include CALLS edges between services
+      if (!serviceIds.has(edge.sourceId) || !serviceIds.has(edge.targetId)) continue;
+      if (edge.type !== 'CALLS') continue;
 
-      let src = edge.sourceId;
-      let tgt = edge.targetId;
-
-      if (edge.type === 'CALLS' || edge.type === 'EXPOSED_BY') {
-        src = memberToMerged.get(src) ?? src;
-        tgt = memberToMerged.get(tgt) ?? tgt;
-        if (src === tgt) continue;
-      } else if (edge.type === 'DEPLOYED_ON') {
-        tgt = memberToMerged.get(tgt) ?? tgt;
-      }
-
-      const key = `${src}--${edge.type}--${tgt}`;
+      const key = `${edge.sourceId}--${edge.type}--${edge.targetId}`;
       if (!seen.has(key)) {
         seen.add(key);
-        processed.push({ id: key, sourceId: src, targetId: tgt, type: edge.type });
+        processed.push(edge);
       }
     }
 
