@@ -1,5 +1,128 @@
-<div class="flex flex-col items-center justify-center h-full text-secondary/40">
-  <span class="material-symbols-outlined text-[48px] mb-3">dashboard</span>
-  <p class="font-headline font-semibold text-lg">Dashboard</p>
-  <p class="text-sm">Coming soon</p>
+<div class="flex flex-col h-full bg-neutral p-6">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <p class="font-headline font-semibold text-2xl text-secondary">Dashboard</p>
+    <p class="text-sm text-secondary/60 mt-1">Overview of your architecture ecosystem</p>
+  </div>
+
+  <!-- Loading state -->
+  @if (isLoading$ | async) {
+    <div class="flex items-center justify-center flex-1">
+      <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  }
+
+  <!-- Error banner -->
+  @if (error$ | async; as errMsg) {
+    <div class="mb-6 px-4 py-3 rounded-lg bg-orange-50 border border-orange-200 text-sm text-orange-700 flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px]">warning</span>
+      {{ errMsg }}
+    </div>
+  }
+
+  <!-- Stats Grid -->
+  @if (!(isLoading$ | async)) {
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+
+      <!-- Teams Card -->
+      <div class="bg-white rounded-lg border border-neutral/20 p-6 shadow-sm">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-secondary/60 text-sm font-medium">Teams</p>
+            <p class="text-4xl font-headline font-bold text-secondary mt-2">
+              {{ (teamCount$ | async) ?? 0 }}
+            </p>
+          </div>
+          <div class="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
+            <span class="material-symbols-outlined text-blue-600 text-[28px]">group</span>
+          </div>
+        </div>
+        <p class="text-xs text-secondary/50 mt-4">Total teams in your organization</p>
+      </div>
+
+      <!-- Projects Card -->
+      <div class="bg-white rounded-lg border border-neutral/20 p-6 shadow-sm">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-secondary/60 text-sm font-medium">Projects</p>
+            <p class="text-4xl font-headline font-bold text-secondary mt-2">
+              {{ (projectCount$ | async) ?? 0 }}
+            </p>
+          </div>
+          <div class="w-12 h-12 rounded-lg bg-purple-50 flex items-center justify-center">
+            <span class="material-symbols-outlined text-purple-600 text-[28px]">folder</span>
+          </div>
+        </div>
+        <p class="text-xs text-secondary/50 mt-4">Active projects across teams</p>
+      </div>
+
+      <!-- Services Card -->
+      <div class="bg-white rounded-lg border border-neutral/20 p-6 shadow-sm">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-secondary/60 text-sm font-medium">Services</p>
+            <p class="text-4xl font-headline font-bold text-secondary mt-2">
+              {{ (serviceCount$ | async) ?? 0 }}
+            </p>
+          </div>
+          <div class="w-12 h-12 rounded-lg bg-green-50 flex items-center justify-center">
+            <span class="material-symbols-outlined text-green-600 text-[28px]">storage</span>
+          </div>
+        </div>
+        <p class="text-xs text-secondary/50 mt-4">Services deployed in the ecosystem</p>
+      </div>
+
+      <!-- Connections Card -->
+      <div class="bg-white rounded-lg border border-neutral/20 p-6 shadow-sm">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-secondary/60 text-sm font-medium">Connections</p>
+            <p class="text-4xl font-headline font-bold text-secondary mt-2">
+              {{ (connectionCount$ | async) ?? 0 }}
+            </p>
+          </div>
+          <div class="w-12 h-12 rounded-lg bg-orange-50 flex items-center justify-center">
+            <span class="material-symbols-outlined text-orange-600 text-[28px]">share</span>
+          </div>
+        </div>
+        <p class="text-xs text-secondary/50 mt-4">Service relationships and dependencies</p>
+      </div>
+
+    </div>
+
+    <!-- Quick Links -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- View Ecosystem Link -->
+      <div class="bg-white rounded-lg border border-neutral/20 p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="font-headline font-semibold text-secondary text-lg">View Ecosystem</p>
+            <p class="text-sm text-secondary/60 mt-2">Explore your architecture graph with hierarchical layout, service grouping, and relationship visualization</p>
+          </div>
+          <span class="material-symbols-outlined text-secondary/40">arrow_forward</span>
+        </div>
+        <a href="/ecosystem-view" class="inline-block mt-4 px-4 py-2 bg-primary text-secondary rounded-md font-medium text-sm hover:opacity-90 transition-opacity">
+          Go to Ecosystem View
+        </a>
+      </div>
+
+      <!-- Design Architecture Link -->
+      <div class="bg-white rounded-lg border border-neutral/20 p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="font-headline font-semibold text-secondary text-lg">Design Architecture</p>
+            <p class="text-sm text-secondary/60 mt-2">Create and manage architecture diagrams on an interactive canvas with drag-and-drop support</p>
+          </div>
+          <span class="material-symbols-outlined text-secondary/40">arrow_forward</span>
+        </div>
+        <a href="/squad-architecture" class="inline-block mt-4 px-4 py-2 bg-primary text-secondary rounded-md font-medium text-sm hover:opacity-90 transition-opacity">
+          Go to Canvas
+        </a>
+      </div>
+
+    </div>
+  }
+
 </div>
