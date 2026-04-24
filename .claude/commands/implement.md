@@ -1,7 +1,7 @@
 ---
 description: Implement a new feature using Angular, TDD, and project coding standards
 allowed-tools: [Read, Edit, Write, Bash, Agent]
-argument-hint: "Describe the feature to implement"
+argument-hint: 'Describe the feature to implement'
 ---
 
 You are an AI assistant that helps users implement new features.
