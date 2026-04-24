@@ -395,3 +395,82 @@ export const relationshipQueries = {
     }
   },
 };
+
+export const ecosystemQueries = {
+  getFullGraph: async (): Promise<{ nodes: any[]; edges: any[] }> => {
+    const session = getSession();
+    try {
+      const teamsResult = await session.run('MATCH (t:Team) RETURN t');
+      const projectsResult = await session.run('MATCH (p:Project) RETURN p');
+      const servicesResult = await session.run('MATCH (s:Service) RETURN s');
+      const edgesResult = await session.run(`
+        MATCH (a:Team)-[:OWNS]->(b:Project)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'OWNS' AS type
+        UNION ALL
+        MATCH (a:Project)-[:DEPLOYED_ON]->(b:Service)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'DEPLOYED_ON' AS type
+        UNION ALL
+        MATCH (a:Service)-[:CALLS]->(b:Service)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'CALLS' AS type
+        UNION ALL
+        MATCH (a:Service)-[:EXPOSED_BY]->(b:Service)
+        RETURN COALESCE(a.id, a.name) AS sourceId, COALESCE(b.id, b.name) AS targetId, 'EXPOSED_BY' AS type
+      `);
+
+      const enrichResult = await session.run(`
+        MATCH (s:Service)
+        OPTIONAL MATCH (p:Project)-[:DEPLOYED_ON]->(s)
+        OPTIONAL MATCH (t:Team)-[:OWNS]->(p)
+        RETURN s.name AS serviceName, p.name AS projectName, t.name AS teamName
+      `);
+
+      const teams = teamsResult.records.map(r => {
+        const tProps = r.get('t').properties;
+        return {
+          ...tProps,
+          id: tProps.id || tProps.name,
+          nodeType: 'TEAM',
+        };
+      });
+      const projects = projectsResult.records.map(r => {
+        const pProps = r.get('p').properties;
+        return {
+          ...pProps,
+          id: pProps.id || pProps.name,
+          nodeType: 'PROJECT',
+        };
+      });
+
+      const serviceEnrichment: Record<string, { projectName?: string; teamName?: string }> = {};
+      enrichResult.records.forEach(r => {
+        const sName = r.get('serviceName');
+        if (sName) {
+          serviceEnrichment[sName] = {
+            projectName: r.get('projectName') ?? undefined,
+            teamName: r.get('teamName') ?? undefined,
+          };
+        }
+      });
+
+      const services = servicesResult.records.map(r => {
+        const sProps = r.get('s').properties;
+        return {
+          ...sProps,
+          id: sProps.id || sProps.name,
+          nodeType: 'SERVICE',
+          ...serviceEnrichment[sProps.name],
+        };
+      });
+
+      const edges = edgesResult.records.map(r => ({
+        sourceId: r.get('sourceId'),
+        targetId: r.get('targetId'),
+        type: r.get('type'),
+      }));
+
+      return serializeNeo4jResponse({ nodes: [...teams, ...projects, ...services], edges });
+    } finally {
+      await session.close();
+    }
+  },
+};

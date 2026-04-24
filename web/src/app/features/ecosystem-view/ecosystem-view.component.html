@@ -1,5 +1,184 @@
-<div class="flex flex-col items-center justify-center h-full text-secondary/40">
-  <span class="material-symbols-outlined text-[48px] mb-3">language</span>
-  <p class="font-headline font-semibold text-lg">Ecosystem View</p>
-  <p class="text-sm">Coming soon</p>
+<div class="flex flex-col h-full relative overflow-hidden bg-neutral">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between px-6 py-3 bg-white border-b border-neutral/20 flex-shrink-0">
+    <div>
+      <p class="font-headline font-semibold text-secondary">Ecosystem View</p>
+      <p class="text-xs text-secondary/50">Service landscape with team & project context</p>
+    </div>
+    <div class="flex items-center gap-4 text-xs">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral/50">
+        <span class="material-symbols-outlined text-[14px]">folder</span>
+        {{ projectNodes.length }} projects
+      </div>
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral/50">
+        <span class="material-symbols-outlined text-[14px]">storage</span>
+        {{ serviceNodes.length }} service groups
+      </div>
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-neutral/50">
+        <span class="material-symbols-outlined text-[14px]">branch</span>
+        {{ edges.length }} connections
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  @if (isLoading$ | async) {
+    <div class="flex-1 flex items-center justify-center">
+      <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  }
+
+  <!-- Error banner -->
+  @if (error$ | async; as errMsg) {
+    <div class="mx-6 mt-3 px-4 py-2 rounded-md bg-orange-50 border border-node-proposed text-xs text-node-proposed flex items-center gap-2">
+      <span class="material-symbols-outlined text-[14px]">warning</span>
+      {{ errMsg }}
+    </div>
+  }
+
+  <!-- Canvas -->
+  @if (!(isLoading$ | async)) {
+    <div class="flex-1 overflow-auto canvas-grid relative" #canvasWrapper>
+      <div class="relative" [style.width.px]="canvasWidth" [style.height.px]="canvasHeight">
+
+        <!-- SVG edge overlay -->
+        <svg class="absolute inset-0 pointer-events-none overflow-visible" [attr.width]="canvasWidth" [attr.height]="canvasHeight">
+          <defs>
+            <marker id="arrow-calls" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#22c55e" />
+            </marker>
+            <marker id="arrow-exposed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#f97316" />
+            </marker>
+          </defs>
+          @for (edge of edges; track trackByEdgeId($index, edge)) {
+            <g>
+              <path
+                [attr.d]="getEdgePath(edge)"
+                [attr.stroke]="getEdgeColor(edge.type)"
+                [attr.stroke-dasharray]="getEdgeDashArray(edge.type)"
+                stroke-width="2.5"
+                stroke-opacity="0.9"
+                fill="none"
+                [attr.marker-end]="'url(#arrow-' + (edge.type === 'CALLS' ? 'calls' : 'exposed') + ')'"
+              />
+              @if (getEdgeMidpoint(edge); as mid) {
+                <text
+                  [attr.x]="mid.x"
+                  [attr.y]="mid.y"
+                  text-anchor="middle"
+                  font-size="9"
+                  font-family="Space Grotesk, sans-serif"
+                  font-weight="600"
+                  letter-spacing="0.05em"
+                  [attr.fill]="getEdgeColor(edge.type)"
+                  class="pointer-events-none select-none"
+                >{{ edge.type }}</text>
+              }
+            </g>
+          }
+        </svg>
+
+        <!-- Project cards (top section) -->
+        @for (node of projectNodes; track trackById($index, node)) {
+          <div class="absolute" [style.left.px]="node.x" [style.top.px]="node.y">
+            <div class="bg-white rounded-lg border-2 p-4 shadow-sm flex flex-col gap-2 border-blue-500" style="width: 220px; min-height: 160px;">
+              <!-- Project name -->
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-headline font-semibold tracking-widest uppercase text-blue-600">
+                  {{ node.name }}
+                </span>
+              </div>
+
+              <!-- Deployed services count badge -->
+              <p class="font-headline font-semibold text-secondary text-sm leading-tight">{{ node.name }}</p>
+
+              <!-- Service count indicator -->
+              <div class="flex flex-col gap-1 mt-auto pt-2 border-t border-neutral/20">
+                <div class="flex items-center gap-1 text-[10px] text-secondary/70 font-medium">
+                  <span class="material-symbols-outlined text-[10px]">storage</span>
+                  {{ node.serviceCount }} {{ node.serviceCount === 1 ? 'service' : 'services' }}
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Service cards (bottom section) -->
+        @for (node of serviceNodes; track trackById($index, node)) {
+          <div class="absolute" [style.left.px]="node.x" [style.top.px]="node.y">
+            <div class="bg-white rounded-lg border-2 p-4 shadow-sm flex flex-col gap-2" [ngClass]="getNodeCardBorderClass(node)" style="width: 220px; min-height: 160px;">
+              <!-- Type badge + count chip -->
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-headline font-semibold tracking-widest uppercase" [ngClass]="node.type === 'PROPOSED' ? 'text-node-proposed' : 'text-node-service'">
+                  {{ node.displayName }}
+                </span>
+                @if (node.count > 1) {
+                  <span class="text-[10px] font-medium bg-neutral text-secondary/60 px-1.5 py-0.5 rounded-full">×{{ node.count }}</span>
+                }
+              </div>
+
+              <!-- Member service names -->
+              @if (node.count > 1) {
+                <div class="flex flex-col gap-0.5">
+                  @for (name of node.memberNames; track trackByName($index, name)) {
+                    <p class="text-[10px] text-secondary/50 truncate">• {{ name }}</p>
+                  }
+                </div>
+              } @else {
+                <!-- Single service: show name as headline -->
+                <p class="font-headline font-semibold text-secondary text-sm leading-tight">{{ node.memberNames[0] }}</p>
+                @if (node.version) {
+                  <p class="text-xs text-secondary/60">v{{ node.version }}</p>
+                }
+              }
+
+              <!-- Project + Team badges (indicators) -->
+              <div class="flex flex-col gap-1 mt-auto pt-2 border-t border-neutral/20">
+                @if (node.projectName) {
+                  <div class="flex items-center gap-1 text-[10px] text-[#6366f1] font-medium">
+                    <span class="material-symbols-outlined text-[10px]">folder</span>
+                    {{ node.projectName }}
+                  </div>
+                }
+                @if (node.teamName) {
+                  <div class="flex items-center gap-1 text-[10px] text-secondary/70 font-medium">
+                    <span class="material-symbols-outlined text-[10px]">group</span>
+                    {{ node.teamName }}
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Legend -->
+  <div class="absolute bottom-4 right-4 bg-white rounded-xl shadow-md p-4 w-56 z-10 border border-neutral/20">
+    <p class="font-headline font-semibold text-secondary text-xs mb-3">Legend</p>
+
+    <div class="space-y-2 mb-3 pb-3 border-b border-neutral/20">
+      @for (item of LEGEND_NODES; track item.label) {
+        <div class="flex items-center gap-2 text-xs">
+          <div class="w-4 h-4 rounded border-2 flex-shrink-0" [ngClass]="item.borderClass"></div>
+          <span class="text-secondary/70">{{ item.label }}</span>
+        </div>
+      }
+    </div>
+
+    <div class="space-y-2">
+      @for (item of LEGEND_EDGES; track item.label) {
+        <div class="flex items-center gap-2 text-xs">
+          <svg class="w-8 h-3 flex-shrink-0" viewBox="0 0 32 6" preserveAspectRatio="none">
+            <line x1="0" y1="3" x2="32" y2="3" [attr.stroke]="item.color" stroke-width="2.5" [attr.stroke-dasharray]="item.dashed ? '3,2' : 'none'" />
+          </svg>
+          <span class="text-secondary/70">{{ item.label }}</span>
+        </div>
+      }
+    </div>
+  </div>
+
 </div>

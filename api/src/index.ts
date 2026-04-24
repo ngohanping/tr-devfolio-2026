@@ -7,6 +7,7 @@ import servicesRouter from './services';
 import teamsRouter from './teams';
 import projectsRouter from './projects';
 import relationshipsRouter from './relationships';
+import ecosystemRouter from './ecosystem';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use(servicesRouter);
 app.use(teamsRouter);
 app.use(projectsRouter);
 app.use(relationshipsRouter);
+app.use(ecosystemRouter);
 
 app.get('/health', (_, res) => {
   res.status(200).send('OK');
