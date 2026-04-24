@@ -1,4 +1,4 @@
-import { Service, Team } from '../models';
+import { Service, Team, Project, ServiceRelation, ProjectServiceRelation, TeamProjectRelation } from '../models';
 
 export const mockServices: Map<string, Service> = new Map([
   ['1', {
@@ -78,6 +78,105 @@ export const mockTeams: Map<string, Team> = new Map([
     members: ['Grace Lee', 'Henry Park'],
     createdAt: new Date('2024-01-05'),
     updatedAt: new Date('2024-04-20'),
+  }],
+]);
+
+export const mockProjects: Map<string, Project> = new Map([
+  ['p1', {
+    id: 'p1',
+    name: 'User Authentication System',
+    description: 'Handles user authentication and authorization',
+    teamId: '1',
+    createdAt: new Date('2024-01-15'),
+    updatedAt: new Date('2024-04-20'),
+  }],
+  ['p2', {
+    id: 'p2',
+    name: 'Analytics Pipeline',
+    description: 'Data collection and analytics processing',
+    teamId: '2',
+    createdAt: new Date('2024-02-20'),
+    updatedAt: new Date('2024-04-18'),
+  }],
+  ['p3', {
+    id: 'p3',
+    name: 'Web Application Frontend',
+    description: 'Main web application interface',
+    teamId: '3',
+    createdAt: new Date('2024-01-05'),
+    updatedAt: new Date('2024-04-20'),
+  }],
+]);
+
+export const mockServiceRelations: Map<string, ServiceRelation> = new Map([
+  ['sr1', {
+    id: 'sr1',
+    sourceServiceId: '1',
+    targetServiceId: '2',
+    type: 'CALLS',
+    createdAt: new Date('2024-01-20'),
+  }],
+  ['sr2', {
+    id: 'sr2',
+    sourceServiceId: '1',
+    targetServiceId: '3',
+    type: 'CALLS',
+    createdAt: new Date('2024-02-10'),
+  }],
+  ['sr3', {
+    id: 'sr3',
+    sourceServiceId: '3',
+    targetServiceId: '4',
+    type: 'CALLS',
+    createdAt: new Date('2024-04-10'),
+  }],
+]);
+
+export const mockProjectServiceRelations: Map<string, ProjectServiceRelation> = new Map([
+  ['psr1', {
+    id: 'psr1',
+    projectId: 'p1',
+    serviceId: '1',
+    type: 'DEPLOYED_ON',
+    createdAt: new Date('2024-01-20'),
+  }],
+  ['psr2', {
+    id: 'psr2',
+    projectId: 'p1',
+    serviceId: '2',
+    type: 'DEPLOYED_ON',
+    createdAt: new Date('2024-01-20'),
+  }],
+  ['psr3', {
+    id: 'psr3',
+    projectId: 'p2',
+    serviceId: '3',
+    type: 'DEPLOYED_ON',
+    createdAt: new Date('2024-02-25'),
+  }],
+]);
+
+export const mockTeamProjectRelations: Map<string, TeamProjectRelation> = new Map([
+  ['tpr1', {
+    id: 'tpr1',
+    teamId: '1',
+    projectId: 'p1',
+    type: 'OWNS',
+    createdAt: new Date('2024-01-15'),
+  }],
+  ['tpr2', {
+    id: 'tpr2',
+    teamId: '2',
+    projectId: 'p2',
+    type: 'OWNS',
+    createdAt: new Date('2024-02-20'),
+  }],
+  ['tpr3', {
+    id: 'tpr3',
+    teamId: '3',
+    projectId: 'p3',
+    type: 'OWNS',
+    createdAt: new Date('2024-01-05'),
   }],
 ]);
 

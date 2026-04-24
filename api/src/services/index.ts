@@ -1,22 +1,23 @@
 import { Router, Request, Response } from 'express';
-import { mockServices, generateId } from '../db/mockData';
-import { Service, CreateServicePayload, UpdateServicePayload } from '../models';
+import { serviceQueries } from '../db/queries';
+import { CreateServicePayload, UpdateServicePayload } from '../models';
 
 const router = Router();
 
-router.get('/api/services', (req: Request, res: Response) => {
+router.get('/api/services', async (req: Request, res: Response) => {
   try {
-    const services = Array.from(mockServices.values());
+    const services = await serviceQueries.getAll();
     res.status(200).json({ data: services });
   } catch (error) {
+    console.error('GET /api/services error:', error);
     res.status(500).json({ error: 'Failed to fetch services' });
   }
 });
 
-router.get('/api/services/:id', (req: Request, res: Response) => {
+router.get('/api/services/:id', async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const service = mockServices.get(id);
+    const service = await serviceQueries.getById(id);
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
     }
@@ -26,7 +27,7 @@ router.get('/api/services/:id', (req: Request, res: Response) => {
   }
 });
 
-router.post('/api/services', (req: Request, res: Response) => {
+router.post('/api/services', async (req: Request, res: Response) => {
   try {
     const payload: CreateServicePayload = req.body;
 
@@ -34,58 +35,39 @@ router.post('/api/services', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields: name, type' });
     }
 
-    const id = generateId();
-    const newService: Service = {
-      id,
-      name: payload.name,
-      type: payload.type,
-      description: payload.description,
-      status: payload.status || 'active',
-      teamId: payload.teamId,
-      tags: payload.tags,
-      version: payload.version,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    mockServices.set(id, newService);
+    const newService = await serviceQueries.create(payload);
     res.status(201).json({ data: newService });
   } catch (error) {
+    console.error('POST /api/services error:', error);
     res.status(500).json({ error: 'Failed to create service' });
   }
 });
 
-router.patch('/api/services/:id', (req: Request, res: Response) => {
+router.patch('/api/services/:id', async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const service = mockServices.get(id);
-    if (!service) {
+    const payload: UpdateServicePayload = req.body;
+
+    const updated = await serviceQueries.update(id, payload);
+    if (!updated) {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    const payload: UpdateServicePayload = req.body;
-    const updated: Service = {
-      ...service,
-      ...payload,
-      updatedAt: new Date(),
-    };
-
-    mockServices.set(id, updated);
     res.status(200).json({ data: updated });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update service' });
   }
 });
 
-router.delete('/api/services/:id', (req: Request, res: Response) => {
+router.delete('/api/services/:id', async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const service = mockServices.get(id);
-    if (!service) {
+    const deleted = await serviceQueries.delete(id);
+
+    if (!deleted) {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    mockServices.delete(id);
     res.status(200).json({ data: { id, message: 'Service deleted' } });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete service' });
