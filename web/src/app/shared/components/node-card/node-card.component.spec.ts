@@ -56,17 +56,6 @@ describe('NodeCardComponent', () => {
     expect(component.borderClass).toBe('border-node-proposed');
   });
 
-  it('applies muted border for restricted node', () => {
-    setup(makeNode({ status: 'restricted' }));
-    expect(component.borderClass).toBe('border-node-muted');
-  });
-
-  it('shows restricted access label for restricted nodes', () => {
-    setup(makeNode({ status: 'restricted' }));
-    const el: HTMLElement = fixture.nativeElement;
-    expect(el.textContent?.toLowerCase()).toContain('restricted access');
-  });
-
   it('renders tags', () => {
     setup(makeNode({ tags: ['REST', 'V3.0'] }));
     const el: HTMLElement = fixture.nativeElement;

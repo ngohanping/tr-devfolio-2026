@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { ArchitectureNode } from '../../shared/models/architecture-node.model';
+import { ArchitectureEdge, ArchitectureNode } from '../../shared/models/architecture-node.model';
 
 const MOCK_CANVAS_NODES: ArchitectureNode[] = [
   {
@@ -65,14 +65,6 @@ const MOCK_MARKETPLACE_SERVICES: ArchitectureNode[] = [
     status: 'active',
     position: { x: 0, y: 0 },
   },
-  {
-    id: 'mp-vault-manager',
-    type: 'SERVICE',
-    name: 'Vault-Manager',
-    subtitle: 'Secrets',
-    status: 'restricted',
-    position: { x: 0, y: 0 },
-  },
 ];
 
 @Injectable({
@@ -80,6 +72,7 @@ const MOCK_MARKETPLACE_SERVICES: ArchitectureNode[] = [
 })
 export class ArchitectureService {
   private canvasNodes$ = new BehaviorSubject<ArchitectureNode[]>(MOCK_CANVAS_NODES);
+  private edges$ = new BehaviorSubject<ArchitectureEdge[]>([]);
 
   getCanvasNodes$(): Observable<ArchitectureNode[]> {
     return this.canvasNodes$.asObservable();
@@ -87,6 +80,10 @@ export class ArchitectureService {
 
   getMarketplaceServices$(): Observable<ArchitectureNode[]> {
     return new BehaviorSubject<ArchitectureNode[]>(MOCK_MARKETPLACE_SERVICES).asObservable();
+  }
+
+  getEdges$(): Observable<ArchitectureEdge[]> {
+    return this.edges$.asObservable();
   }
 
   updateNodePosition(id: string, position: { x: number; y: number }): void {
@@ -98,5 +95,23 @@ export class ArchitectureService {
   addNodeToCanvas(node: ArchitectureNode): void {
     const current = this.canvasNodes$.getValue();
     this.canvasNodes$.next([...current, node]);
+  }
+
+  removeNode(id: string): void {
+    this.canvasNodes$.next(this.canvasNodes$.getValue().filter(n => n.id !== id));
+    this.edges$.next(this.edges$.getValue().filter(e => e.sourceId !== id && e.targetId !== id));
+  }
+
+  addEdge(sourceId: string, targetId: string): void {
+    if (sourceId === targetId) return;
+    const current = this.edges$.getValue();
+    const isDuplicate = current.some(e => e.sourceId === sourceId && e.targetId === targetId);
+    if (isDuplicate) return;
+    const edge: ArchitectureEdge = { id: `edge-${sourceId}-${targetId}-${Date.now()}`, sourceId, targetId };
+    this.edges$.next([...current, edge]);
+  }
+
+  removeEdge(edgeId: string): void {
+    this.edges$.next(this.edges$.getValue().filter(e => e.id !== edgeId));
   }
 }

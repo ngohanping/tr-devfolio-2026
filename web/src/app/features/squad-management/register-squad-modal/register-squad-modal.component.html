@@ -1,0 +1,120 @@
+<!-- Backdrop -->
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+  (click)="onClose()"
+>
+  <!-- Modal panel — stop propagation so clicks inside don't close -->
+  <div
+    class="relative w-full max-w-xl mx-4 rounded-2xl overflow-hidden shadow-2xl"
+    (click)="$event.stopPropagation()"
+  >
+
+    <!-- Header -->
+    <div class="bg-secondary px-8 py-6 flex items-start justify-between">
+      <div>
+        <h2 class="font-headline font-bold text-primary text-xl">Register New Squad</h2>
+        <p class="font-headline text-tertiary/50 text-xs tracking-widest mt-1 uppercase">Initialize Architecture Identity</p>
+      </div>
+      <button
+        class="text-tertiary/40 hover:text-tertiary transition-colors mt-0.5"
+        (click)="onClose()"
+        aria-label="Close modal"
+      >
+        <span class="material-symbols-outlined text-[22px]">close</span>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="bg-tertiary px-8 py-6 space-y-6">
+
+      <!-- Row 1: Squad Name + Ecosystem Domain -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/50 mb-1.5">
+            Squad Name
+          </label>
+          <input
+            type="text"
+            [(ngModel)]="name"
+            placeholder="e.g. Flight Core"
+            class="w-full px-3 py-2.5 rounded-lg border border-neutral text-secondary text-sm placeholder:text-secondary/30 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label class="block font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/50 mb-1.5">
+            Ecosystem Domain
+          </label>
+          <select
+            [(ngModel)]="domain"
+            class="w-full px-3 py-2.5 rounded-lg border border-neutral text-secondary text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent appearance-none"
+          >
+            <option value="" disabled>Select domain…</option>
+            @for (d of domains; track d) {
+              <option [value]="d">{{ d }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 2: Primary Technical Lead -->
+      <div>
+        <label class="block font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/50 mb-1.5">
+          Primary Technical Lead
+        </label>
+        <div class="relative">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary/30 text-[18px]">person_search</span>
+          <input
+            type="text"
+            [(ngModel)]="technicalLead"
+            placeholder="Search team members…"
+            class="w-full pl-9 pr-3 py-2.5 rounded-lg border border-neutral text-secondary text-sm placeholder:text-secondary/30 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      <!-- Row 3: Initial Architecture Blueprint -->
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="material-symbols-outlined text-secondary/40 text-[18px]">account_tree</span>
+          <span class="font-headline font-semibold text-secondary text-sm">Initial Architecture Blueprint</span>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          @for (bp of blueprints; track bp.value) {
+            <button
+              type="button"
+              class="flex flex-col items-center gap-2 py-4 px-3 rounded-xl border-2 transition-all"
+              [class]="selectedBlueprint() === bp.value
+                ? 'border-primary bg-primary/5'
+                : 'border-neutral hover:border-secondary/20'"
+              (click)="selectBlueprint(bp.value)"
+            >
+              <span class="material-symbols-outlined text-secondary/40 text-[28px]">{{ bp.icon }}</span>
+              <span class="font-headline font-semibold text-[10px] uppercase tracking-widest text-secondary/60">{{ bp.label }}</span>
+            </button>
+          }
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="bg-tertiary border-t border-neutral/60 px-8 py-5 flex items-center justify-end gap-3">
+      <button
+        type="button"
+        class="px-6 py-2.5 rounded-lg border-2 border-secondary text-secondary text-sm font-headline font-semibold hover:bg-secondary hover:text-tertiary transition-colors"
+        (click)="onClose()"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        class="px-6 py-2.5 rounded-lg bg-primary text-secondary text-sm font-headline font-semibold transition-colors hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+        [disabled]="!isValid"
+        (click)="onSubmit()"
+      >
+        Initialize Squad
+      </button>
+    </div>
+
+  </div>
+</div>

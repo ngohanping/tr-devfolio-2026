@@ -1,5 +1,155 @@
-<div class="flex flex-col items-center justify-center h-full text-secondary/40">
-  <span class="material-symbols-outlined text-[48px] mb-3">group</span>
-  <p class="font-headline font-semibold text-lg">Squad Management</p>
-  <p class="text-sm">Coming soon</p>
+<div class="flex flex-col h-full overflow-auto bg-neutral p-8">
+
+  <!-- ── Page Header ── -->
+  <div class="flex items-start justify-between mb-8">
+    <div class="max-w-lg">
+      <h1 class="font-headline font-bold text-secondary text-3xl mb-1.5">Squad Registry</h1>
+      <p class="text-secondary/50 text-sm leading-relaxed">
+        Manage technical ownership, architectural standards, and system
+        dependencies across the flight operations ecosystem.
+      </p>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="flex gap-3 flex-shrink-0">
+      @if (squadCount$ | async; as count) {
+        <div class="flex items-center gap-3 bg-white rounded-xl shadow-sm px-5 py-4 min-w-[120px]">
+          <div class="w-9 h-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-secondary text-[18px]">groups</span>
+          </div>
+          <div>
+            <p class="font-headline font-bold text-secondary text-2xl leading-none">{{ count }}</p>
+            <p class="text-secondary/50 text-[11px] mt-0.5">Total Squads</p>
+          </div>
+        </div>
+      }
+      @if (serviceCount$ | async; as total) {
+        <div class="flex items-center gap-3 bg-white rounded-xl shadow-sm px-5 py-4 min-w-[120px]">
+          <div class="w-9 h-9 rounded-lg bg-neutral border border-secondary/10 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-secondary/50 text-[18px]">hub</span>
+          </div>
+          <div>
+            <p class="font-headline font-bold text-secondary text-2xl leading-none">{{ total }}</p>
+            <p class="text-secondary/50 text-[11px] mt-0.5">Total Services</p>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- ── Toolbar ── -->
+  <div class="flex items-center justify-between mb-4">
+    <div class="relative w-72">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary/30 text-[16px]">search</span>
+      <input
+        type="text"
+        placeholder="Search squads, domains, or leads…"
+        class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-secondary/10 bg-white text-secondary placeholder:text-secondary/30 focus:outline-none focus:ring-2 focus:ring-primary/50"
+      />
+    </div>
+    <button
+      class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-secondary text-sm font-headline font-semibold hover:bg-primary/90 transition-colors"
+      (click)="openRegisterModal()"
+    >
+      <span class="material-symbols-outlined text-[18px]">add</span>
+      Register New Squad
+    </button>
+  </div>
+
+  <!-- ── Table ── -->
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden flex-1">
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-neutral">
+          <th class="px-6 py-3.5 text-left font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/40">Squad</th>
+          <th class="px-4 py-3.5 text-left font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/40">Domain</th>
+          <th class="px-4 py-3.5 text-left font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/40">Technical Lead</th>
+          <th class="px-4 py-3.5 text-left font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/40">Architecture</th>
+          <th class="px-4 py-3.5 text-left font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/40">Services</th>
+          <th class="px-4 py-3.5 text-left font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/40">Status</th>
+          <th class="px-4 py-3.5 text-left font-headline text-[11px] font-semibold uppercase tracking-wider text-secondary/40">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (squads$ | async; as squads) {
+          @for (squad of squads; track trackBySquadId($index, squad)) {
+            <tr class="border-b border-neutral/50 hover:bg-neutral/30 transition-colors">
+
+              <!-- Squad name + avatar -->
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+                    <span class="font-headline font-bold text-secondary text-xs">{{ squadInitials(squad.name) }}</span>
+                  </div>
+                  <span class="font-headline font-semibold text-secondary text-sm">{{ squad.name }}</span>
+                </div>
+              </td>
+
+              <!-- Domain -->
+              <td class="px-4 py-4">
+                <span class="text-sm text-secondary/70">{{ squad.domain }}</span>
+              </td>
+
+              <!-- Technical Lead -->
+              <td class="px-4 py-4">
+                <span class="text-sm text-secondary/70">{{ squad.technicalLead }}</span>
+              </td>
+
+              <!-- Architecture Blueprint -->
+              <td class="px-4 py-4">
+                <span class="px-2.5 py-1 rounded-md bg-neutral text-secondary/60 text-[11px] font-headline font-semibold uppercase tracking-wide">
+                  {{ blueprintLabel(squad.blueprintType) }}
+                </span>
+              </td>
+
+              <!-- Service Count -->
+              <td class="px-4 py-4">
+                <span class="font-headline font-semibold text-secondary text-sm">{{ squad.serviceCount }}</span>
+              </td>
+
+              <!-- Status badge -->
+              <td class="px-4 py-4">
+                @if (squad.status === 'stable') {
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-node-service/10 text-node-service text-[11px] font-headline font-semibold uppercase tracking-wide">
+                    <span class="w-1.5 h-1.5 rounded-full bg-node-service"></span>
+                    Stable
+                  </span>
+                } @else if (squad.status === 'degraded') {
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-node-proposed/10 text-node-proposed text-[11px] font-headline font-semibold uppercase tracking-wide">
+                    <span class="w-1.5 h-1.5 rounded-full bg-node-proposed"></span>
+                    Degraded
+                  </span>
+                } @else {
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-node-muted/10 text-node-muted text-[11px] font-headline font-semibold uppercase tracking-wide">
+                    <span class="w-1.5 h-1.5 rounded-full bg-node-muted"></span>
+                    Proposed
+                  </span>
+                }
+              </td>
+
+              <!-- Actions -->
+              <td class="px-4 py-4">
+                <button
+                  class="p-1.5 rounded-lg hover:bg-neutral transition-colors"
+                  [attr.aria-label]="'View ' + squad.name"
+                >
+                  <span class="material-symbols-outlined text-secondary/30 text-[18px]">chevron_right</span>
+                </button>
+              </td>
+
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
 </div>
+
+<!-- ── Register New Squad Modal ── -->
+@if (showModal) {
+  <app-register-squad-modal
+    (close)="closeModal()"
+    (submitted)="onSquadRegistered($event)"
+  />
+}
