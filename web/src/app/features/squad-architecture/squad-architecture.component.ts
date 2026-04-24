@@ -1,13 +1,21 @@
-import { Component, ChangeDetectionStrategy, OnInit, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ChangeDetectorRef, ElementRef, HostListener, OnInit, ViewChild, inject } from '@angular/core';
 import { AsyncPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { Observable } from 'rxjs';
+import { Observable, combineLatest } from 'rxjs';
 
 import { ArchitectureService } from '../../core/services/architecture.service';
 import { ExportService } from '../../core/services/export.service';
 import { NodeCardComponent } from '../../shared/components/node-card/node-card.component';
-import { ArchitectureNode } from '../../shared/models/architecture-node.model';
+import { ArchitectureEdge, ArchitectureNode } from '../../shared/models/architecture-node.model';
+
+export interface CanvasState {
+  nodes: ArchitectureNode[];
+  edges: ArchitectureEdge[];
+}
+
+const NODE_WIDTH = 200;
+const NODE_HEIGHT = 110;
 
 @Component({
   selector: 'app-squad-architecture',
@@ -19,14 +27,60 @@ import { ArchitectureNode } from '../../shared/models/architecture-node.model';
 export class SquadArchitectureComponent implements OnInit {
   private readonly architectureService = inject(ArchitectureService);
   private readonly exportService = inject(ExportService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
-  canvasNodes$!: Observable<ArchitectureNode[]>;
+  @ViewChild('canvasContainer') canvasContainerRef!: ElementRef<HTMLElement>;
+
+  canvasState$!: Observable<CanvasState>;
   marketplaceServices$!: Observable<ArchitectureNode[]>;
   marketplaceFilter = '';
 
+  isMarketplaceOpen = true;
+  isConnectionMode = false;
+  connectionSourceId: string | null = null;
+
   ngOnInit(): void {
-    this.canvasNodes$ = this.architectureService.getCanvasNodes$();
+    this.canvasState$ = combineLatest({
+      nodes: this.architectureService.getCanvasNodes$(),
+      edges: this.architectureService.getEdges$(),
+    });
     this.marketplaceServices$ = this.architectureService.getMarketplaceServices$();
+  }
+
+  @HostListener('document:keydown.escape')
+  cancelConnectionMode(): void {
+    this.isConnectionMode = false;
+    this.connectionSourceId = null;
+    this.cdr.markForCheck();
+  }
+
+  toggleMarketplace(): void {
+    this.isMarketplaceOpen = !this.isMarketplaceOpen;
+    this.cdr.markForCheck();
+  }
+
+  onConnectSelected(nodeId: string): void {
+    if (!this.isConnectionMode) {
+      this.isConnectionMode = true;
+      this.connectionSourceId = nodeId;
+    } else if (this.connectionSourceId === nodeId) {
+      this.cancelConnectionMode();
+      return;
+    } else {
+      this.architectureService.addEdge(this.connectionSourceId!, nodeId);
+      this.isConnectionMode = false;
+      this.connectionSourceId = null;
+    }
+    this.cdr.markForCheck();
+  }
+
+  onRemoveNode(nodeId: string): void {
+    this.architectureService.removeNode(nodeId);
+    if (this.connectionSourceId === nodeId) {
+      this.isConnectionMode = false;
+      this.connectionSourceId = null;
+      this.cdr.markForCheck();
+    }
   }
 
   // cdkDragFreeDragPosition owns the visual transform — getFreeDragPosition() returns
@@ -36,11 +90,29 @@ export class SquadArchitectureComponent implements OnInit {
     this.architectureService.updateNodePosition(node.id, pos);
   }
 
-  addToCanvas(service: ArchitectureNode): void {
+  onMarketplaceDragEnded(event: CdkDragEnd, service: ArchitectureNode): void {
+    event.source.reset();
+    const dropPoint = event.dropPoint;
+    const container = this.canvasContainerRef.nativeElement;
+    const rect = container.getBoundingClientRect();
+
+    if (
+      dropPoint.x >= rect.left &&
+      dropPoint.x <= rect.right &&
+      dropPoint.y >= rect.top &&
+      dropPoint.y <= rect.bottom
+    ) {
+      const canvasX = dropPoint.x - rect.left + container.scrollLeft;
+      const canvasY = dropPoint.y - rect.top + container.scrollTop;
+      this.addToCanvas(service, { x: canvasX, y: canvasY });
+    }
+  }
+
+  addToCanvas(service: ArchitectureNode, position?: { x: number; y: number }): void {
     const newNode: ArchitectureNode = {
       ...service,
       id: `${service.id}-${Date.now()}`,
-      position: { x: 100 + Math.random() * 300, y: 100 + Math.random() * 200 },
+      position: position ?? { x: 100 + Math.random() * 300, y: 100 + Math.random() * 200 },
     };
     this.architectureService.addNodeToCanvas(newNode);
   }
@@ -48,6 +120,44 @@ export class SquadArchitectureComponent implements OnInit {
   onExportMermaid(nodes: ArchitectureNode[]): void {
     const mermaid = this.exportService.exportAsMermaid(nodes);
     console.log(mermaid);
+  }
+
+  // Computes an SVG path string between two node edges with at most one bend.
+  // Selects exit/entry sides based on dominant axis, then routes H→V or V→H.
+  getEdgePath(source: ArchitectureNode, target: ArchitectureNode): string {
+    const W = NODE_WIDTH, H = NODE_HEIGHT;
+    const scx = source.position.x + W / 2;
+    const scy = source.position.y + H / 2;
+    const tcx = target.position.x + W / 2;
+    const tcy = target.position.y + H / 2;
+    const dx = tcx - scx;
+    const dy = tcy - scy;
+
+    let x1: number, y1: number, x2: number, y2: number;
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      if (dx >= 0) {
+        x1 = source.position.x + W; y1 = scy;
+        x2 = target.position.x;     y2 = tcy;
+      } else {
+        x1 = source.position.x;     y1 = scy;
+        x2 = target.position.x + W; y2 = tcy;
+      }
+      return `M ${x1},${y1} H ${x2} V ${y2}`;
+    } else {
+      if (dy >= 0) {
+        x1 = scx; y1 = source.position.y + H;
+        x2 = tcx; y2 = target.position.y;
+      } else {
+        x1 = scx; y1 = source.position.y;
+        x2 = tcx; y2 = target.position.y + H;
+      }
+      return `M ${x1},${y1} V ${y2} H ${x2}`;
+    }
+  }
+
+  getNodeFromList(nodes: ArchitectureNode[], id: string): ArchitectureNode | undefined {
+    return nodes.find(n => n.id === id);
   }
 
   trackById(_index: number, node: ArchitectureNode): string {

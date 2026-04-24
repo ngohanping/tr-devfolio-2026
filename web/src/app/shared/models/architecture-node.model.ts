@@ -1,5 +1,5 @@
 export type NodeType = 'SERVICE' | 'DATABASE' | 'WORKER' | 'PROPOSED';
-export type NodeStatus = 'active' | 'proposed' | 'restricted';
+export type NodeStatus = 'active' | 'proposed';
 
 export interface ArchitectureNode {
   id: string;
@@ -9,4 +9,10 @@ export interface ArchitectureNode {
   tags?: string[];
   status: NodeStatus;
   position: { x: number; y: number };
+}
+
+export interface ArchitectureEdge {
+  id: string;
+  sourceId: string;
+  targetId: string;
 }

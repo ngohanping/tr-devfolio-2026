@@ -1,9 +1,32 @@
 <div
-  class="relative bg-white rounded-lg border-2 p-4 min-w-[200px] shadow-sm cursor-grab active:cursor-grabbing select-none"
+  class="group relative bg-white rounded-lg border-2 p-4 min-w-[200px] shadow-sm cursor-grab active:cursor-grabbing select-none"
   [ngClass]="borderClass"
+  [class.ring-2]="isConnectionSource"
+  [class.ring-primary]="isConnectionSource"
   role="article"
   [attr.aria-label]="node.name + ' ' + node.type + ' node'"
 >
+  <!-- Remove button — visible on hover -->
+  <button
+    class="absolute -top-2 -right-2 hidden group-hover:flex w-5 h-5 rounded-full bg-red-500 text-white items-center justify-center text-xs shadow z-10 cursor-pointer leading-none"
+    (click)="$event.stopPropagation(); removeRequested.emit()"
+    aria-label="Remove node"
+    title="Remove node"
+  >×</button>
+
+  <!-- Connect port — visible on hover, always visible in connection mode -->
+  <button
+    class="absolute top-1/2 -right-3 -translate-y-1/2 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center shadow z-10 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+    [class.bg-primary]="isConnectionSource"
+    [class.bg-secondary]="!isConnectionSource"
+    [style.opacity]="isConnectionMode || isConnectionSource ? 1 : null"
+    (click)="$event.stopPropagation(); connectSelected.emit()"
+    aria-label="Connect node"
+    title="Connect from this node"
+  >
+    <span class="material-symbols-outlined text-white" style="font-size: 10px">link</span>
+  </button>
+
   <!-- Header row -->
   <div class="flex items-center justify-between mb-2">
     <span
@@ -37,10 +60,4 @@
     </div>
   }
 
-  <!-- Restricted overlay label -->
-  @if (node.status === 'restricted') {
-    <p class="mt-2 text-[10px] font-semibold tracking-widest text-red-500 uppercase">
-      Restricted Access
-    </p>
-  }
 </div>
